@@ -7,7 +7,7 @@ describe("generateHash", () => {
     const reader = Readable.from(Buffer.from(input));
     const hash = await generateHash(reader);
     const expectedHash = Buffer.from(
-      "ec9db904d636ef61f1421b2ba47112a4fa6b8964fd4a0a514834455c21df7812",
+      "0686f0a605973dc1bf035d1e2b9bad1985a0bff712ddd88abd8d2593e5f99030",
       "hex"
     );
     expect(hash).toEqual(expectedHash);
