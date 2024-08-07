@@ -39,7 +39,6 @@ export class Metadata {
    * Constructs a new Metadata instance.
    * @param options - The options to initialize the Metadata instance.
    */
-  /* eslint-disable max-statements */
   constructor(options: MetadataOptions) {
     this.igdbId = options.igdbId;
     this.name = options.name;
