@@ -26,6 +26,7 @@ const INPUT_DIRECTORY = join(TEMPORARY_TEST_DIRECTORY, "/input/");
 const OUTPUT_DIRECTORY = join(TEMPORARY_TEST_DIRECTORY, "/output/");
 const COVER_FILE = join(TEMPORARY_TEST_DIRECTORY, "test_cover.png");
 const TEXT_FILE = join(INPUT_DIRECTORY, "test_text.txt");
+const SECOND_TEXT_FILE = join(INPUT_DIRECTORY, "test_text2.txt");
 const TARGET_FILE = join(TEMPORARY_TEST_DIRECTORY, "test.clbg");
 
 /* eslint-disable max-lines-per-function */
@@ -39,6 +40,7 @@ describe("CLBGFile", () => {
     mkdirSync(OUTPUT_DIRECTORY);
     writeFileSync(COVER_FILE, Buffer.from(PNG_FILE, "hex"));
     writeFileSync(TEXT_FILE, Buffer.from(TXT_FILE, "utf-8"));
+    writeFileSync(SECOND_TEXT_FILE, Buffer.from(TXT_FILE, "utf-8"));
 
     await CLBGFile.create({
       coverFile: COVER_FILE,
@@ -62,9 +64,7 @@ describe("CLBGFile", () => {
       const createdFile = await CLBGFile.fromFile(TARGET_FILE);
       expect(createdFile.header).toEqual(clbgFile.header);
       expect(createdFile.metadata).toEqual(clbgFile.metadata);
-
-      const coverBuffer = await createdFile.getCoverBytes();
-      expect(coverBuffer).toEqual(await clbgFile.getCoverBytes());
+      expect(createdFile.cover).toEqual(clbgFile.cover);
 
       await createdFile.extractGame(OUTPUT_DIRECTORY);
 
@@ -89,7 +89,7 @@ describe("CLBGFile", () => {
     test("should not overwrite an existing target file if overwrite is false", async () => {
       await expect(async () => {
         await CLBGFile.create({
-          coverFile: COVER_FILE,
+          coverFile: Buffer.from(PNG_FILE, "hex"),
           metadata: METADATA,
           overwrite: false,
           sourceDirectory: INPUT_DIRECTORY,
@@ -130,9 +130,35 @@ describe("CLBGFile", () => {
       const clbgFile = await CLBGFile.fromFile(TARGET_FILE);
       rmSync(COVER_FILE);
       await clbgFile.saveCover(COVER_FILE);
-      const coverBuffer = await clbgFile.getCoverBytes();
+      expect(clbgFile.cover).toEqual(
+        Buffer.from(PNG_FILE, "hex").toString("base64")
+      );
+    });
+  });
 
-      expect(coverBuffer.equals(Buffer.from(PNG_FILE, "hex"))).toBe(true);
+  describe("saveMetadata", () => {
+    test("should save the metadata to a target file", async () => {
+      const clbgFile = await CLBGFile.fromFile(TARGET_FILE);
+      const metadataFile = join(TEMPORARY_TEST_DIRECTORY, "metadata.json");
+      await clbgFile.saveMetadata(metadataFile);
+      const metadata = readFileSync(metadataFile, "utf-8");
+      expect(metadata).toEqual(METADATA.toJSON());
+    });
+  });
+
+  describe("extractCoverFromFile", () => {
+    test("should extract the cover image from a CLBG file", async () => {
+      const cover = await CLBGFile.getCoverFromFile(TARGET_FILE);
+      expect(cover).toEqual(Buffer.from(PNG_FILE, "hex").toString("base64"));
+    });
+  });
+
+  describe("getTotalFiles", () => {
+    test("should return the total number of files in a directory", () => {
+      const expectedFileCount = 5;
+      const totalFiles = CLBGFile.getTotalFiles(TEMPORARY_TEST_DIRECTORY);
+
+      expect(totalFiles).toBe(expectedFileCount);
     });
   });
 
