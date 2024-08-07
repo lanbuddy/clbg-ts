@@ -1,16 +1,28 @@
 {
   "name": "clbg-ts",
   "version": "1.0.0",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "type": "module",
   "license": "MIT",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    }
+  },
   "scripts": {
-    "build": "tsc",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "build:clean": "rm -rf ./dist",
+    "build:esm": "tsc --project tsconfig.esm.json",
+    "build:cjs": "tsc --project tsconfig.cjs.json",
+    "build": "yarn build:clean && yarn build:esm && yarn build:cjs",
+    "lint": "eslint . --ignore-pattern 'dist'",
+    "lint:fix": "eslint . --ignore-pattern 'dist' --fix",
     "test": "jest",
-    "type-check": "tsc --noEmit"
+    "test:coverage": "jest --coverage",
+    "type-check": "yarn type-check:esm && yarn type-check:cjs",
+    "type-check:esm": "tsc --project tsconfig.esm.json --noEmit",
+    "type-check:cjs": "tsc --project tsconfig.cjs.json --noEmit"
   },
   "devDependencies": {
     "@eslint/js": "^9.6.0",
