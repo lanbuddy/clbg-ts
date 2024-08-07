@@ -4,19 +4,13 @@ import { Readable } from "stream";
 import { createHash } from "crypto";
 
 const generateHash = (
-  reader: Readable,
+  reader: ReadStream,
   progressReporter?: ProgressReporter
 ): Promise<Buffer> =>
   new Promise((resolve, reject) => {
     if (progressReporter) {
-      if (reader instanceof ReadStream) {
-        progressReporter.advance("hashing");
-        progressReporter.setTotalData(statSync(reader.path).size);
-      } else {
-        throw new Error(
-          "If you want to use a ProgressReporter, the reader must be a ReadStream."
-        );
-      }
+      progressReporter.advance("hashing");
+      progressReporter.setTotalData(statSync(reader.path).size);
     }
 
     const hash = createHash("sha512-256");
