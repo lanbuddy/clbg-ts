@@ -9,6 +9,11 @@ export default [
   ...tseslint.configs.stylistic,
   {
     rules: {
+      "max-lines": ["error", { max: 500 }],
+      "max-lines-per-function": ["error", { max: 100 }],
+      "max-statements": ["error", { max: 20 }],
+      "no-magic-numbers": ["error", { ignore: [0, 1] }],
+      "no-unused-vars": "off",
       "one-var": ["error", { const: "never", let: "never", var: "always" }],
     },
   },
