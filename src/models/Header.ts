@@ -1,4 +1,4 @@
-import { PathLike, readFileSync } from "fs";
+import { PathLike, createReadStream } from "fs";
 import { Buffer } from "buffer";
 
 const HEADER_CONSTANTS = {
@@ -83,12 +83,19 @@ export class Header {
    * @param filePath - The path to the file.
    * @returns The Header instance created from the file.
    */
-  static fromFile(filePath: PathLike): Header {
-    const data = readFileSync(filePath).slice(
-      HEADER_CONSTANTS.HEADER_START,
-      HEADER_CONSTANTS.HEADER_SIZE
-    );
-    return Header.fromBytes(data);
+  static async fromFile(filePath: PathLike): Promise<Header> {
+    const readStream = createReadStream(filePath, {
+      start: HEADER_CONSTANTS.HEADER_START,
+    });
+
+    const headerBuffer = Buffer.alloc(HEADER_CONSTANTS.HEADER_SIZE);
+    let bytesRead = 0;
+    for await (const chunk of readStream) {
+      chunk.copy(headerBuffer, bytesRead);
+      bytesRead += chunk.length;
+    }
+
+    return Header.fromBytes(headerBuffer);
   }
 
   /**

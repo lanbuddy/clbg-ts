@@ -81,7 +81,7 @@ export class CLBGFile {
     targetPath: PathLike,
     header?: Header
   ): Promise<string> {
-    const usableHeader = header || Header.fromFile(targetPath);
+    const usableHeader = header || (await Header.fromFile(targetPath));
 
     const coverReadStream = createReadStream(targetPath, {
       end: usableHeader.coverOffset + usableHeader.coverLength,
@@ -105,7 +105,7 @@ export class CLBGFile {
    */
   static async fromFile(targetPath: PathLike): Promise<CLBGFile> {
     checkPathExists(targetPath, "file");
-    const header = Header.fromFile(targetPath);
+    const header = await Header.fromFile(targetPath);
     const metadata = await Metadata.fromFile(targetPath, header);
     const cover = await CLBGFile.getCoverFromFile(targetPath, header);
 
