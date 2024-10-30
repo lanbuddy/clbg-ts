@@ -1,5 +1,6 @@
-import { PathLike, createReadStream } from "fs";
 import { Header } from "./Header";
+import { PathLike } from "fs";
+import { open } from "fs/promises";
 
 const METADATA_DEFAULTS = {
   ZERO: 0,
@@ -92,17 +93,15 @@ export class Metadata {
     targetPath: PathLike,
     header: Header
   ): Promise<Metadata> {
-    const readStream = createReadStream(targetPath, {
-      start: header.metadataOffset,
-    });
-
+    const fileHandle = await open(targetPath, "r");
     const metadataBuffer = Buffer.alloc(header.metadataLength);
-    let bytesRead = 0;
-    for await (const chunk of readStream) {
-      chunk.copy(metadataBuffer, bytesRead);
-      bytesRead += chunk.length;
-    }
-
+    await fileHandle.read(
+      metadataBuffer,
+      0,
+      header.metadataLength,
+      header.metadataOffset
+    );
+    await fileHandle.close();
     return Metadata.fromBytes(metadataBuffer);
   }
 

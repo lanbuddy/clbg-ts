@@ -20,6 +20,7 @@ import { checkPathExists } from "../utils/checkPath";
 import { generateHash } from "../utils/hashGenerator";
 
 import { join } from "path";
+import { open } from "fs/promises";
 import { tmpdir } from "os";
 
 const EMPTY_BUFFER_LENGTH = 0;
@@ -82,19 +83,15 @@ export class CLBGFile {
     header?: Header
   ): Promise<string> {
     const usableHeader = header || (await Header.fromFile(targetPath));
-
-    const coverReadStream = createReadStream(targetPath, {
-      end: usableHeader.coverOffset + usableHeader.coverLength,
-      start: usableHeader.coverOffset,
-    });
-
+    const fileHandle = await open(targetPath, "r");
     const coverBuffer = Buffer.alloc(usableHeader.coverLength);
-    let bytesRead = 0;
-    for await (const chunk of coverReadStream) {
-      chunk.copy(coverBuffer, bytesRead);
-      bytesRead += chunk.length;
-    }
-
+    await fileHandle.read(
+      coverBuffer,
+      0,
+      usableHeader.coverLength,
+      usableHeader.coverOffset
+    );
+    await fileHandle.close();
     return coverBuffer.toString("base64");
   }
 
@@ -108,7 +105,6 @@ export class CLBGFile {
     const header = await Header.fromFile(targetPath);
     const metadata = await Metadata.fromFile(targetPath, header);
     const cover = await CLBGFile.getCoverFromFile(targetPath, header);
-
     return new CLBGFile({ cover, filePath: targetPath, header, metadata });
   }
 
