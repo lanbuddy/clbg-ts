@@ -1,4 +1,5 @@
-import * as tar from "tar";
+import * as compressing from "compressing";
+import { HEADER_CONSTANTS, Header } from "./Header";
 import {
   PathLike,
   createReadStream,
@@ -6,22 +7,17 @@ import {
   existsSync,
   readFileSync,
   readdirSync,
-  rmSync,
   statSync,
   writeFileSync,
 } from "fs";
 import { ProgressReport, ProgressReporter } from "../utils/progressReporter";
-import { createCompressor, createDecompressor } from "lzma-native";
-
-import { Header } from "./Header";
 import { Metadata } from "./Metadata";
-
 import { checkPathExists } from "../utils/checkPath";
+import { createHash } from "crypto";
 import { generateHash } from "../utils/hashGenerator";
-
 import { join } from "path";
 import { open } from "fs/promises";
-import { tmpdir } from "os";
+import { pipeline } from "stream/promises";
 
 const EMPTY_BUFFER_LENGTH = 0;
 const EMPTY_DIR_LENGTH = 0;
@@ -30,15 +26,6 @@ interface CreateOptions {
   sourceDirectory: PathLike;
   coverFile: PathLike | Buffer;
   metadata: Metadata;
-  targetFile: PathLike;
-  overwrite?: boolean;
-}
-
-interface WriteFileOptions {
-  header: Header;
-  metadata: Metadata;
-  coverBytes: Buffer;
-  archivePath: PathLike;
   targetFile: PathLike;
   overwrite?: boolean;
 }
@@ -124,61 +111,29 @@ export class CLBGFile {
     });
 
     const archiveHash = await generateHash(fileStream, progressReporter);
+
     return archiveHash.equals(this.header.archiveHash);
   }
 
-  /**
-   * Extracts the archive of the CLBG file to a directory.
-   * @param targetDirectory The target directory to extract the archive to.
-   * @returns A Promise that resolves when the extraction is complete.
-   */
   private async extractArchiveToDirectory(
     targetDirectory: PathLike,
     progressReporter: ProgressReporter
   ): Promise<void> {
-    const tempFile = join(tmpdir(), `temp-${Date.now()}.tar`);
-
     progressReporter.advance("decompressing");
     progressReporter.setTotalData(statSync(this.filePath).size);
 
-    const tempStream = createWriteStream(tempFile);
     const fileStream = createReadStream(this.filePath, {
       start: this.header.archiveOffset,
     });
 
-    const decompressor = createDecompressor();
-    fileStream.pipe(decompressor).pipe(tempStream);
-
-    await new Promise((resolve, reject) => {
-      tempStream.on("close", resolve);
-      tempStream.on("error", reject);
-      fileStream.on("error", reject);
-      fileStream.on("data", (chunk) => {
-        progressReporter.updateData(chunk.length);
-      });
-      decompressor.on("error", reject);
+    fileStream.on("data", (chunk) => {
+      progressReporter.updateData(chunk.length);
+    });
+    fileStream.on("end", () => {
+      fileStream.close();
     });
 
-    let tarEntryCount = 0;
-    await tar.list({
-      file: tempFile,
-      onReadEntry: () => {
-        tarEntryCount += 1;
-      },
-    });
-
-    progressReporter.advance("unpacking");
-    progressReporter.setTotalData(tarEntryCount);
-
-    await tar.x({
-      cwd: targetDirectory.toString(),
-      file: tempFile,
-      onReadEntry: () => {
-        progressReporter.updateData(1);
-      },
-    });
-
-    rmSync(tempFile);
+    await compressing.tgz.uncompress(fileStream, targetDirectory.toString());
   }
 
   /**
@@ -192,7 +147,7 @@ export class CLBGFile {
   ): Promise<void> {
     const progressReporter = new ProgressReporter({
       callback: onProgress,
-      totalSteps: 3,
+      totalSteps: 1,
     });
 
     checkPathExists(targetDirectory, "directory");
@@ -200,7 +155,7 @@ export class CLBGFile {
     if (readdirSync(targetDirectory).length > EMPTY_DIR_LENGTH) {
       throw new Error(`Target directory is not empty: ${targetDirectory}`);
     }
-    if (!(await this.validateArchiveHash(progressReporter))) {
+    if (!(await this.validateArchiveHash())) {
       throw new Error("Archive hash does not match the one in the header.");
     }
 
@@ -248,112 +203,57 @@ export class CLBGFile {
   }
 
   /**
-   * Creates a tar.xz archive of the CLBG file.
-   * @returns A Promise that resolves to the path of the created archive file.
+   * Gets the total size of a directory.
+   * @param directoryPath The path of the directory.
+   * @returns The total size of the directory.
    */
-  static async createTarXzArchive(
-    sourceDirectory: PathLike,
-    progressReporter: ProgressReporter
-  ): Promise<string> {
-    const tempTarFile = join(tmpdir(), `temp-${Date.now()}.tar`);
-    const tempXzFile = `${tempTarFile}.xz`;
+  static getTotalSize(directoryPath: PathLike): number {
+    let totalSize = 0;
 
-    progressReporter.advance("packing");
-    progressReporter.setTotalData(this.getTotalFiles(sourceDirectory));
+    const calculateSize = (directory: PathLike) => {
+      const files = readdirSync(directory, { withFileTypes: true });
 
-    await tar.c(
-      {
-        cwd: sourceDirectory.toString(),
-        file: tempTarFile,
-        onWriteEntry: () => {
-          progressReporter.updateData(1);
-        },
-      },
-      ["."]
-    );
-
-    progressReporter.advance("compressing");
-    progressReporter.setTotalData(statSync(tempTarFile).size);
-
-    const compressor = createCompressor();
-    const tarStream = createReadStream(tempTarFile);
-    const xzStream = createWriteStream(tempXzFile);
-
-    tarStream.pipe(compressor).pipe(xzStream);
-
-    await new Promise((resolve, reject) => {
-      xzStream.on("close", resolve);
-      xzStream.on("error", reject);
-      tarStream.on("error", reject);
-      tarStream.on("data", (chunk) => {
-        progressReporter.updateData(chunk.length);
+      files.forEach((file) => {
+        const filePath = join(directory.toString(), file.name);
+        if (file.isDirectory()) {
+          calculateSize(filePath);
+        } else {
+          const stats = statSync(filePath);
+          totalSize += stats.size;
+        }
       });
-      compressor.on("error", reject);
-    });
+    };
 
-    return tempXzFile;
+    calculateSize(directoryPath);
+    return totalSize;
   }
 
+  /* eslint-disable max-statements */
+
   /**
-   * Writes the CLBG file to disk.
+   * Writes the CLBG file to a target file.
    * @param options The options for writing the CLBG file.
-   */
-
-  private static async writeFile(
-    options: WriteFileOptions,
-    progressReporter: ProgressReporter
-  ): Promise<void> {
-    if (existsSync(options.targetFile) && !options.overwrite) {
-      throw new Error(`Target path already exists: ${options.targetFile}`);
-    }
-
-    const writeStream = createWriteStream(options.targetFile);
-    writeStream.write(options.header.toBytes());
-    writeStream.write(options.metadata.toBytes());
-    writeStream.write(options.coverBytes);
-
-    await new Promise<void>((resolve, reject) => {
-      writeStream.on("error", reject);
-      writeStream.on("finish", resolve);
-      writeStream.end();
-    });
-    progressReporter.advance("writing");
-    progressReporter.setTotalData(statSync(options.archivePath).size);
-
-    const appendStream = createWriteStream(options.targetFile, { flags: "a" });
-    const archiveStream = createReadStream(options.archivePath);
-    archiveStream.pipe(appendStream);
-
-    await new Promise((resolve, reject) => {
-      archiveStream.on("end", resolve);
-      archiveStream.on("data", (chunk) => {
-        progressReporter.updateData(chunk.length);
-      });
-      archiveStream.on("error", reject);
-      appendStream.on("error", reject);
-    });
-
-    rmSync(options.archivePath);
-  }
-
-  /**
-   * Creates a CLBG file.
-   * @param options The options for creating the CLBG file.
+   * @param onProgress The callback for progress reporting.
    * @returns A Promise that resolves to a CLBGFile instance.
    */
   static async create(
     options: CreateOptions,
     onProgress?: (progressReport: ProgressReport) => void
   ): Promise<CLBGFile> {
+    if (existsSync(options.targetFile) && !options.overwrite) {
+      throw new Error(`Target path already exists: ${options.targetFile}`);
+    }
+
     const progressReporter = new ProgressReporter({
       callback: onProgress,
-      totalSteps: 4,
+      totalSteps: 1,
     });
+
+    progressReporter.advance("packing");
 
     checkPathExists(options.sourceDirectory, "directory");
 
     let coverBytes: Buffer = Buffer.alloc(EMPTY_BUFFER_LENGTH);
-
     if (Buffer.isBuffer(options.coverFile)) {
       coverBytes = options.coverFile;
     } else if (typeof options.coverFile === "string") {
@@ -361,34 +261,45 @@ export class CLBGFile {
       coverBytes = readFileSync(options.coverFile);
     }
 
-    const tempFile = await CLBGFile.createTarXzArchive(
-      options.sourceDirectory,
-      progressReporter
-    );
-    const archiveStream = createReadStream(tempFile);
-
-    await new Promise((resolve) => {
-      archiveStream.on("ready", resolve);
-    });
-
-    const archiveHash = await generateHash(archiveStream, progressReporter);
-
     const header = Header.fromData(
       options.metadata.toBytes(),
       coverBytes,
-      archiveHash
+      Buffer.alloc(HEADER_CONSTANTS.DEFAULT_ZERO)
     );
 
-    await this.writeFile(
-      {
-        archivePath: tempFile,
-        coverBytes,
-        header,
-        metadata: options.metadata,
-        overwrite: options.overwrite,
-        targetFile: options.targetFile,
-      },
-      progressReporter
+    const targetStream = createWriteStream(options.targetFile);
+    targetStream.write(header.toBytes());
+    targetStream.write(options.metadata.toBytes());
+    targetStream.write(coverBytes);
+
+    const totalByteSize = this.getTotalSize(options.sourceDirectory);
+    progressReporter.setTotalData(totalByteSize);
+
+    const tarGzStream = new compressing.tgz.Stream();
+    tarGzStream.addEntry(options.sourceDirectory.toString(), {
+      ignoreBase: true,
+    });
+    const hash = createHash("sha512-256");
+
+    tarGzStream.on("data", (chunk) => {
+      hash.update(chunk);
+      progressReporter.updateData(chunk.length);
+    });
+
+    await pipeline(tarGzStream, targetStream);
+
+    targetStream.close();
+
+    const targetFile = await open(options.targetFile, "r+");
+
+    const archiveHash = hash.digest();
+    header.archiveHash = archiveHash;
+
+    await targetFile.write(
+      header.toBytes(),
+      HEADER_CONSTANTS.HEADER_START,
+      HEADER_CONSTANTS.HEADER_SIZE,
+      HEADER_CONSTANTS.HEADER_START
     );
 
     progressReporter.complete();

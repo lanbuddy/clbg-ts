@@ -2,14 +2,15 @@ import { Buffer } from "buffer";
 import { PathLike } from "fs";
 import { open } from "fs/promises";
 
-const HEADER_CONSTANTS = {
+export const HEADER_CONSTANTS = {
   DEFAULT_VERSION: 1,
   DEFAULT_ZERO: 0,
   HEADER_SIZE: 64,
   HEADER_START: 0,
   SIGNATURE: "CLBG\r\n\x1A\n",
 };
-const OFFSETS = {
+
+export const OFFSETS = {
   ARCHIVE_HASH: 32,
   ARCHIVE_OFFSET: 28,
   COVER_LENGTH: 24,
