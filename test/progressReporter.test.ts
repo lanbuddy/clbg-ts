@@ -51,6 +51,7 @@ describe("ProgressReporter", () => {
       currentData: updateData,
       currentStep: 1,
       progress: expectedProgress,
+      timeRemaining: 0,
       totalData,
       totalSteps: 1,
     };
@@ -64,6 +65,7 @@ describe("ProgressReporter", () => {
       currentData: totalData,
       currentStep: 1,
       progress: 100,
+      timeRemaining: 0,
       totalData,
       totalSteps: 1,
     };

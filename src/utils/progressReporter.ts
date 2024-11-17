@@ -1,5 +1,6 @@
 const STEP_OFFSET = 1;
 const PROGRESS_MAX = 100;
+const UPDATE_INTERVAL = 1000;
 
 /**
  * Represents a progress report.
@@ -10,6 +11,7 @@ export interface ProgressReport {
   totalSteps: number;
   currentData: number;
   totalData: number;
+  timeRemaining: number;
   currentAction: string;
 }
 
@@ -22,6 +24,9 @@ export class ProgressReporter {
   private currentStep: number;
   private currentData: number;
   private currentAction: string;
+  private lastUpdated: number;
+  private timeRemaining: number;
+  private startTime: number;
   private callback?: (progressReport: ProgressReport) => void;
 
   /**
@@ -37,6 +42,9 @@ export class ProgressReporter {
     this.totalData = 0;
     this.currentData = 0;
     this.currentAction = "";
+    this.lastUpdated = 0;
+    this.startTime = new Date().getTime();
+    this.timeRemaining = Number.MAX_SAFE_INTEGER;
     this.callback = options.callback;
   }
 
@@ -69,11 +77,24 @@ export class ProgressReporter {
   public updateData(data: number): void {
     this.currentData += data;
     if (this.callback) {
+      const currentTime = new Date().getTime();
+      if (currentTime - this.lastUpdated < UPDATE_INTERVAL) {
+        return;
+      }
+
+      this.lastUpdated = currentTime;
+
+      const elapsedTime = currentTime - this.startTime;
+      const progress = this.progress();
+      const timePerPercent = elapsedTime / progress;
+      this.timeRemaining = timePerPercent * (PROGRESS_MAX - progress);
+
       this.callback({
         currentAction: this.currentAction,
         currentData: this.currentData,
         currentStep: this.currentStep,
         progress: this.progress(),
+        timeRemaining: this.timeRemaining,
         totalData: this.totalData,
         totalSteps: this.totalSteps,
       } as ProgressReport);
@@ -101,6 +122,7 @@ export class ProgressReporter {
         currentData: this.currentData,
         currentStep: this.currentStep,
         progress: this.progress(),
+        timeRemaining: 0,
         totalData: this.totalData,
         totalSteps: this.totalSteps,
       } as ProgressReport);
