@@ -18,7 +18,9 @@
     "build": "yarn build:clean && yarn build:esm && yarn build:cjs",
     "lint": "eslint . --ignore-pattern 'dist'",
     "lint:fix": "eslint . --ignore-pattern 'dist' --fix",
-    "test": "jest",
+    "test": "yarn test:esm && yarn test:cjs",
+    "test:esm": "jest --config=jest.config.esm.ts",
+    "test:cjs": "jest --config=jest.config.cjs.ts",
     "test:coverage": "jest --coverage",
     "type-check": "yarn type-check:esm && yarn type-check:cjs",
     "type-check:esm": "tsc --project tsconfig.esm.json --noEmit",
@@ -44,7 +46,8 @@
   },
   "dependencies": {
     "@types/lzma-native": "^4.0.4",
+    "compressing": "^1.10.1",
     "lzma-native": "^8.0.6",
-    "tar": "^7.4.0"
+    "tar": "^7.4.3"
   }
 }
