@@ -1,6 +1,6 @@
 {
   "name": "clbg-ts",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "license": "MIT",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -11,6 +11,9 @@
       "require": "./dist/cjs/index.js"
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build:clean": "rm -rf ./dist",
     "build:esm": "tsc --project tsconfig.esm.json",
