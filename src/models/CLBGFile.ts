@@ -147,7 +147,7 @@ export class CLBGFile {
   ): Promise<void> {
     const progressReporter = new ProgressReporter({
       callback: onProgress,
-      totalSteps: 1,
+      totalSteps: 2,
     });
 
     checkPathExists(targetDirectory, "directory");
@@ -155,7 +155,7 @@ export class CLBGFile {
     if (readdirSync(targetDirectory).length > EMPTY_DIR_LENGTH) {
       throw new Error(`Target directory is not empty: ${targetDirectory}`);
     }
-    if (!(await this.validateArchiveHash())) {
+    if (!(await this.validateArchiveHash(progressReporter))) {
       throw new Error("Archive hash does not match the one in the header.");
     }
 
