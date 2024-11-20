@@ -1,6 +1,6 @@
 {
   "name": "clbg-ts",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "license": "MIT",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -48,9 +48,6 @@
     "typescript-eslint": "^7.16.0"
   },
   "dependencies": {
-    "@types/lzma-native": "^4.0.4",
-    "compressing": "^1.10.1",
-    "lzma-native": "^8.0.6",
-    "tar": "^7.4.3"
+    "compressing": "^1.10.1"
   }
 }
