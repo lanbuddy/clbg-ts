@@ -97,12 +97,16 @@ export class CLBGFile {
 
   /**
    * Validates the archive hash of the CLBG file.
+   * @param progressReporter The progress reporter for reporting progress.
+   * @param abortSignal The signal for aborting the validation.
    * @returns A Promise that resolves to a boolean indicating whether the archive hash is valid.
    */
   private async validateArchiveHash(
-    progressReporter?: ProgressReporter
+    progressReporter?: ProgressReporter,
+    abortSignal?: AbortSignal
   ): Promise<boolean> {
     const fileStream = createReadStream(this.filePath, {
+      signal: abortSignal,
       start: this.header.archiveOffset,
     });
 
@@ -117,12 +121,14 @@ export class CLBGFile {
 
   private async extractArchiveToDirectory(
     targetDirectory: PathLike,
-    progressReporter: ProgressReporter
+    progressReporter: ProgressReporter,
+    abortSignal?: AbortSignal
   ): Promise<void> {
     progressReporter.advance("decompressing");
     progressReporter.setTotalData(statSync(this.filePath).size);
 
     const fileStream = createReadStream(this.filePath, {
+      signal: abortSignal,
       start: this.header.archiveOffset,
     });
 
@@ -139,11 +145,14 @@ export class CLBGFile {
   /**
    * Extracts the game files from the CLBG file to a target directory.
    * @param targetDirectory The target directory to extract the game files to.
+   * @param onProgress The callback for progress reporting.
+   * @param abortSignal The signal for aborting the extraction.
    * @returns A Promise that resolves when the extraction is complete.
    */
   async extractGame(
     targetDirectory: PathLike,
-    onProgress?: (progressReport: ProgressReport) => void
+    onProgress?: (progressReport: ProgressReport) => void,
+    abortSignal?: AbortSignal
   ): Promise<void> {
     const progressReporter = new ProgressReporter({
       callback: onProgress,
@@ -155,11 +164,15 @@ export class CLBGFile {
     if (readdirSync(targetDirectory).length > EMPTY_DIR_LENGTH) {
       throw new Error(`Target directory is not empty: ${targetDirectory}`);
     }
-    if (!(await this.validateArchiveHash(progressReporter))) {
+    if (!(await this.validateArchiveHash(progressReporter, abortSignal))) {
       throw new Error("Archive hash does not match the one in the header.");
     }
 
-    await this.extractArchiveToDirectory(targetDirectory, progressReporter);
+    await this.extractArchiveToDirectory(
+      targetDirectory,
+      progressReporter,
+      abortSignal
+    );
 
     progressReporter.complete();
   }
@@ -234,11 +247,13 @@ export class CLBGFile {
    * Writes the CLBG file to a target file.
    * @param options The options for writing the CLBG file.
    * @param onProgress The callback for progress reporting.
+   * @param abortSignal The signal for aborting the writing.
    * @returns A Promise that resolves to a CLBGFile instance.
    */
   static async create(
     options: CreateOptions,
-    onProgress?: (progressReport: ProgressReport) => void
+    onProgress?: (progressReport: ProgressReport) => void,
+    abortSignal?: AbortSignal
   ): Promise<CLBGFile> {
     if (existsSync(options.targetFile) && !options.overwrite) {
       throw new Error(`Target path already exists: ${options.targetFile}`);
@@ -267,7 +282,9 @@ export class CLBGFile {
       Buffer.alloc(HEADER_CONSTANTS.DEFAULT_ZERO)
     );
 
-    const targetStream = createWriteStream(options.targetFile);
+    const targetStream = createWriteStream(options.targetFile, {
+      signal: abortSignal,
+    });
     targetStream.write(header.toBytes());
     targetStream.write(options.metadata.toBytes());
     targetStream.write(coverBytes);
@@ -286,7 +303,7 @@ export class CLBGFile {
       progressReporter.updateData(chunk.length);
     });
 
-    await pipeline(tarGzStream, targetStream);
+    await pipeline(tarGzStream, targetStream, { signal: abortSignal });
 
     targetStream.close();
 
@@ -301,6 +318,8 @@ export class CLBGFile {
       HEADER_CONSTANTS.HEADER_SIZE,
       HEADER_CONSTANTS.HEADER_START
     );
+
+    targetFile.close();
 
     progressReporter.complete();
 

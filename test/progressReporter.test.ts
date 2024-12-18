@@ -72,4 +72,23 @@ describe("ProgressReporter", () => {
 
     expect(callback).toHaveBeenCalledWith(completedProgressReport);
   });
+
+  test("should only report progress if the update interval has passed", () => {
+    const progressReporter = new ProgressReporter({
+      callback,
+      totalSteps: 1,
+    });
+
+    const totalData = 200;
+    const updateData = 100;
+
+    progressReporter?.advance("test");
+    progressReporter?.setTotalData(totalData);
+    progressReporter?.updateData(updateData);
+
+    progressReporter?.updateData(updateData);
+    expect(callback).toHaveBeenCalledTimes(1);
+    progressReporter?.updateData(updateData);
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
 });

@@ -23,11 +23,13 @@ const METADATA = new Metadata({
 
 const TEMPORARY_TEST_DIRECTORY = join(tmpdir(), "/clbgfile-test/");
 const INPUT_DIRECTORY = join(TEMPORARY_TEST_DIRECTORY, "/input/");
+const INPUT_SUBDIRECTORY = join(INPUT_DIRECTORY, "/subdirectory/");
 const OUTPUT_DIRECTORY = join(TEMPORARY_TEST_DIRECTORY, "/output/");
 const COVER_FILE = join(TEMPORARY_TEST_DIRECTORY, "test_cover.png");
 const TEXT_FILE = join(INPUT_DIRECTORY, "test_text.txt");
 const SECOND_TEXT_FILE = join(INPUT_DIRECTORY, "test_text2.txt");
 const TARGET_FILE = join(TEMPORARY_TEST_DIRECTORY, "test.clbg");
+const SUBDIRECTORY_TEXT_FILE = join(INPUT_SUBDIRECTORY, "test_text.txt");
 
 /* eslint-disable max-lines-per-function */
 describe("CLBGFile", () => {
@@ -37,9 +39,11 @@ describe("CLBGFile", () => {
     }
     mkdirSync(TEMPORARY_TEST_DIRECTORY);
     mkdirSync(INPUT_DIRECTORY);
+    mkdirSync(INPUT_SUBDIRECTORY);
     mkdirSync(OUTPUT_DIRECTORY);
     writeFileSync(COVER_FILE, Buffer.from(PNG_FILE, "hex"));
     writeFileSync(TEXT_FILE, Buffer.from(TXT_FILE, "utf-8"));
+    writeFileSync(SUBDIRECTORY_TEXT_FILE, Buffer.from(TXT_FILE, "utf-8"));
     writeFileSync(SECOND_TEXT_FILE, Buffer.from(TXT_FILE, "utf-8"));
 
     await CLBGFile.create({
@@ -55,6 +59,30 @@ describe("CLBGFile", () => {
     test("should create a valid CLBG file", async () => {
       const clbgFile = await CLBGFile.create({
         coverFile: COVER_FILE,
+        metadata: METADATA,
+        overwrite: true,
+        sourceDirectory: INPUT_DIRECTORY,
+        targetFile: TARGET_FILE,
+      });
+
+      const createdFile = await CLBGFile.fromFile(TARGET_FILE);
+      expect(createdFile.header).toEqual(clbgFile.header);
+      expect(createdFile.metadata).toEqual(clbgFile.metadata);
+      expect(createdFile.cover).toEqual(clbgFile.cover);
+
+      await createdFile.extractGame(OUTPUT_DIRECTORY);
+
+      expect(
+        readFileSync(join(OUTPUT_DIRECTORY, "test_text.txt"), "utf-8")
+      ).toEqual(TXT_FILE);
+
+      rmSync(OUTPUT_DIRECTORY, { recursive: true });
+      mkdirSync(OUTPUT_DIRECTORY);
+    });
+
+    test("should create a valid clbg file with the cover in buffer format", async () => {
+      const clbgFile = await CLBGFile.create({
+        coverFile: Buffer.from(PNG_FILE, "hex"),
         metadata: METADATA,
         overwrite: true,
         sourceDirectory: INPUT_DIRECTORY,
@@ -155,7 +183,7 @@ describe("CLBGFile", () => {
 
   describe("getTotalFiles", () => {
     test("should return the total number of files in a directory", () => {
-      const expectedFileCount = 5;
+      const expectedFileCount = 6;
       const totalFiles = CLBGFile.getTotalFiles(TEMPORARY_TEST_DIRECTORY);
 
       expect(totalFiles).toBe(expectedFileCount);
