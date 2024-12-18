@@ -24,7 +24,7 @@
     "test": "yarn test:esm && yarn test:cjs",
     "test:esm": "jest --config=jest.config.esm.ts",
     "test:cjs": "jest --config=jest.config.cjs.ts",
-    "test:coverage": "jest --coverage",
+    "test:coverage": "jest --config=jest.config.esm.ts --coverage",
     "type-check": "yarn type-check:esm && yarn type-check:cjs",
     "type-check:esm": "tsc --project tsconfig.esm.json --noEmit",
     "type-check:cjs": "tsc --project tsconfig.cjs.json --noEmit"
