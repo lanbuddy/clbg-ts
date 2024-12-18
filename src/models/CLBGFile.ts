@@ -28,6 +28,7 @@ interface CreateOptions {
   metadata: Metadata;
   targetFile: PathLike;
   overwrite?: boolean;
+  disableCompression?: boolean;
 }
 
 interface CLBGFileConstructorOptions {
@@ -119,6 +120,36 @@ export class CLBGFile {
     return archiveHash.equals(this.header.archiveHash);
   }
 
+  /**
+   * Checks if the file is compressed.
+   * Reads the first two bytes for the file and checks against the magic
+   * numbers for gzip files.
+   * @param fileStream The file stream to check.
+   * @returns A boolean indicating whether the file is compressed.
+   */
+  private async isCompressed(filePath: PathLike): Promise<boolean> {
+    const MAGIC_NUMBER_SIZE = 2;
+    const MAGIC_NUMBER_FIRST_BYTE = 0x1f;
+    const MAGIC_NUMBER_SECOND_BYTE = 0x8b;
+
+    const fileStream = createReadStream(filePath, {
+      end: this.header.archiveOffset + MAGIC_NUMBER_SIZE,
+      start: this.header.archiveOffset,
+    });
+    const magicNumber = await new Promise<Buffer | string>((resolve) => {
+      fileStream.on("data", (chunk) => {
+        resolve(chunk);
+      });
+    });
+
+    fileStream.close();
+
+    return (
+      magicNumber[0] === MAGIC_NUMBER_FIRST_BYTE &&
+      magicNumber[1] === MAGIC_NUMBER_SECOND_BYTE
+    );
+  }
+
   private async extractArchiveToDirectory(
     targetDirectory: PathLike,
     progressReporter: ProgressReporter,
@@ -126,6 +157,8 @@ export class CLBGFile {
   ): Promise<void> {
     progressReporter.advance("decompressing");
     progressReporter.setTotalData(statSync(this.filePath).size);
+
+    const isCompressed = await this.isCompressed(this.filePath);
 
     const fileStream = createReadStream(this.filePath, {
       signal: abortSignal,
@@ -139,7 +172,11 @@ export class CLBGFile {
       fileStream.close();
     });
 
-    await compressing.tgz.uncompress(fileStream, targetDirectory.toString());
+    if (isCompressed) {
+      await compressing.tgz.uncompress(fileStream, targetDirectory.toString());
+    } else {
+      await compressing.tar.uncompress(fileStream, targetDirectory.toString());
+    }
   }
 
   /**
@@ -242,7 +279,6 @@ export class CLBGFile {
   }
 
   /* eslint-disable max-statements */
-
   /**
    * Writes the CLBG file to a target file.
    * @param options The options for writing the CLBG file.
@@ -292,18 +328,23 @@ export class CLBGFile {
     const totalByteSize = this.getTotalSize(options.sourceDirectory);
     progressReporter.setTotalData(totalByteSize);
 
-    const tarGzStream = new compressing.tgz.Stream();
-    tarGzStream.addEntry(options.sourceDirectory.toString(), {
-      ignoreBase: true,
-    });
     const hash = createHash("sha512-256");
 
-    tarGzStream.on("data", (chunk) => {
+    let compressionStream = new compressing.tgz.Stream();
+    if (options.disableCompression) {
+      compressionStream = new compressing.tar.Stream();
+    }
+
+    compressionStream.addEntry(options.sourceDirectory.toString(), {
+      ignoreBase: true,
+    });
+
+    compressionStream.on("data", (chunk) => {
       hash.update(chunk);
       progressReporter.updateData(chunk.length);
     });
 
-    await pipeline(tarGzStream, targetStream, { signal: abortSignal });
+    await pipeline(compressionStream, targetStream, { signal: abortSignal });
 
     targetStream.close();
 

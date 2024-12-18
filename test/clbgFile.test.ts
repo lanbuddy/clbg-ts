@@ -104,6 +104,31 @@ describe("CLBGFile", () => {
       mkdirSync(OUTPUT_DIRECTORY);
     });
 
+    test("should create a valid clbg file without compression", async () => {
+      const clbgFile = await CLBGFile.create({
+        coverFile: COVER_FILE,
+        disableCompression: true,
+        metadata: METADATA,
+        overwrite: true,
+        sourceDirectory: INPUT_DIRECTORY,
+        targetFile: TARGET_FILE,
+      });
+
+      const createdFile = await CLBGFile.fromFile(TARGET_FILE);
+      expect(createdFile.header).toEqual(clbgFile.header);
+      expect(createdFile.metadata).toEqual(clbgFile.metadata);
+      expect(createdFile.cover).toEqual(clbgFile.cover);
+
+      await createdFile.extractGame(OUTPUT_DIRECTORY);
+
+      expect(
+        readFileSync(join(OUTPUT_DIRECTORY, "test_text.txt"), "utf-8")
+      ).toEqual(TXT_FILE);
+
+      rmSync(OUTPUT_DIRECTORY, { recursive: true });
+      mkdirSync(OUTPUT_DIRECTORY);
+    });
+
     test("should overwrite an existing target file if overwrite is true", async () => {
       await CLBGFile.create({
         coverFile: COVER_FILE,
