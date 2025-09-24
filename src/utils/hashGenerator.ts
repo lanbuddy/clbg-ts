@@ -1,5 +1,5 @@
 import { ReadStream, statSync } from "fs";
-import { ProgressReporter } from "./progressReporter";
+import { ProgressReporter } from "./progressReporter.js";
 import { createHash } from "crypto";
 
 const generateHash = (

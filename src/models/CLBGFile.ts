@@ -1,5 +1,5 @@
 import * as compressing from "compressing";
-import { HEADER_CONSTANTS, Header } from "./Header";
+import { HEADER_CONSTANTS, Header } from "./Header.js";
 import {
   PathLike,
   createReadStream,
@@ -10,11 +10,11 @@ import {
   statSync,
   writeFileSync,
 } from "fs";
-import { ProgressReport, ProgressReporter } from "../utils/progressReporter";
-import { Metadata } from "./Metadata";
-import { checkPathExists } from "../utils/checkPath";
+import { ProgressReport, ProgressReporter } from "../utils/progressReporter.js";
+import { Metadata } from "./Metadata.js";
+import { checkPathExists } from "../utils/checkPath.js";
 import { createHash } from "crypto";
-import { generateHash } from "../utils/hashGenerator";
+import { generateHash } from "../utils/hashGenerator.js";
 import { join } from "path";
 import { open } from "fs/promises";
 import { pipeline } from "stream/promises";
@@ -159,24 +159,62 @@ export class CLBGFile {
     progressReporter.setTotalData(statSync(this.filePath).size);
 
     const isCompressed = await this.isCompressed(this.filePath);
+    const PROGRESS_CHECK_INTERVAL = 100;
 
-    const fileStream = createReadStream(this.filePath, {
+    // Create a progress tracking stream that runs in parallel
+    const progressStream = createReadStream(this.filePath, {
       signal: abortSignal,
       start: this.header.archiveOffset,
     });
 
-    fileStream.on("data", (chunk) => {
+    let progressCompleted = false;
+    progressStream.on("data", (chunk) => {
       progressReporter.updateData(chunk.length);
     });
-    fileStream.on("end", () => {
-      fileStream.close();
+
+    progressStream.on("end", () => {
+      progressCompleted = true;
     });
 
-    if (isCompressed) {
-      await compressing.tgz.uncompress(fileStream, targetDirectory.toString());
-    } else {
-      await compressing.tar.uncompress(fileStream, targetDirectory.toString());
-    }
+    progressStream.on("error", () => {
+      progressCompleted = true;
+    });
+
+    // Create the decompression stream
+    const decompressionStream = createReadStream(this.filePath, {
+      signal: abortSignal,
+      start: this.header.archiveOffset,
+    });
+
+    // Start progress tracking
+    const progressPromise = new Promise<void>((resolve) => {
+      const checkProgress = (): void => {
+        if (progressCompleted) {
+          resolve();
+        } else {
+          setTimeout(checkProgress, PROGRESS_CHECK_INTERVAL);
+        }
+      };
+      checkProgress();
+    });
+
+    // Helper function to avoid ternary linting issue
+    const performDecompression = async (): Promise<void> => {
+      if (isCompressed) {
+        await compressing.tgz.uncompress(
+          decompressionStream,
+          targetDirectory.toString()
+        );
+      } else {
+        await compressing.tar.uncompress(
+          decompressionStream,
+          targetDirectory.toString()
+        );
+      }
+    };
+
+    // Wait for both to complete
+    await Promise.all([progressPromise, performDecompression()]);
   }
 
   /**

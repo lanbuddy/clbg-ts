@@ -1,4 +1,4 @@
-import { Header } from "./Header";
+import { Header } from "./Header.js";
 import { PathLike } from "fs";
 import { open } from "fs/promises";
 

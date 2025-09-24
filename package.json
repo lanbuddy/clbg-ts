@@ -1,6 +1,6 @@
 {
   "name": "clbg-ts",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "license": "MIT",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -8,14 +8,15 @@
   "exports": {
     ".": {
       "import": "./dist/esm/index.js",
-      "require": "./dist/cjs/index.js"
+      "require": "./dist/cjs/index.js",
+      "types": "./dist/types/index.d.ts"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build:clean": "rm -rf ./dist",
+    "build:clean": "powershell \"if (Test-Path './dist') { Remove-Item -Recurse -Force './dist' }\"",
     "build:esm": "tsc --project tsconfig.esm.json",
     "build:cjs": "tsc --project tsconfig.cjs.json",
     "build": "yarn build:clean && yarn build:esm && yarn build:cjs",

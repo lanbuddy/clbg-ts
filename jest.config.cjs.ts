@@ -1,5 +1,8 @@
 /** @type {import('ts-jest').JestConfigWithTsJest} **/
 export default {
+  moduleNameMapper: {
+    "^(\\.\\.?\\/.*)\\.js$": "$1",
+  },
   testEnvironment: "node",
   transform: {
     "^.+.tsx?$": [
