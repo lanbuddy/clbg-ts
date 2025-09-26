@@ -111,8 +111,9 @@ export class CLBGFile {
       start: this.header.archiveOffset,
     });
 
-    await new Promise<void>((resolve) => {
+    await new Promise<void>((resolve, reject) => {
       fileStream.on("ready", () => resolve());
+      fileStream.on("error", (err) => reject(err));
     });
 
     const archiveHash = await generateHash(fileStream, progressReporter);
