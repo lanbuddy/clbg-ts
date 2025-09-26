@@ -1,6 +1,6 @@
 {
   "name": "clbg-ts",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "license": "MIT",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
