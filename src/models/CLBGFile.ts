@@ -22,7 +22,7 @@ import { pipeline } from "stream/promises";
 const EMPTY_BUFFER_LENGTH = 0;
 const EMPTY_DIR_LENGTH = 0;
 
-interface CreateOptions {
+export interface CreateOptions {
   sourceDirectory: PathLike;
   coverFile: PathLike | Buffer;
   metadata: Metadata;
@@ -31,7 +31,7 @@ interface CreateOptions {
   disableCompression?: boolean;
 }
 
-interface CLBGFileConstructorOptions {
+export interface CLBGFileConstructorOptions {
   filePath: PathLike;
   header: Header;
   metadata: Metadata;
@@ -111,8 +111,9 @@ export class CLBGFile {
       start: this.header.archiveOffset,
     });
 
-    await new Promise((resolve) => {
-      fileStream.on("ready", resolve);
+    await new Promise<void>((resolve, reject) => {
+      fileStream.on("ready", () => resolve());
+      fileStream.on("error", (err) => reject(err));
     });
 
     const archiveHash = await generateHash(fileStream, progressReporter);
