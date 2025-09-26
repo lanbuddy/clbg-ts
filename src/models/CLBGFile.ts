@@ -22,7 +22,7 @@ import { pipeline } from "stream/promises";
 const EMPTY_BUFFER_LENGTH = 0;
 const EMPTY_DIR_LENGTH = 0;
 
-interface CreateOptions {
+export interface CreateOptions {
   sourceDirectory: PathLike;
   coverFile: PathLike | Buffer;
   metadata: Metadata;
@@ -31,7 +31,7 @@ interface CreateOptions {
   disableCompression?: boolean;
 }
 
-interface CLBGFileConstructorOptions {
+export interface CLBGFileConstructorOptions {
   filePath: PathLike;
   header: Header;
   metadata: Metadata;

@@ -20,7 +20,7 @@ export const OFFSETS = {
   VERSION: 8,
 };
 
-interface HeaderOptions {
+export interface HeaderOptions {
   version?: number;
   metadataOffset?: number;
   metadataLength?: number;

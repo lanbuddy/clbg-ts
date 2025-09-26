@@ -6,7 +6,7 @@ const METADATA_DEFAULTS = {
   ZERO: 0,
 };
 
-interface MetadataOptions {
+export interface MetadataOptions {
   igdbId: number;
   name: string;
   description?: string;
